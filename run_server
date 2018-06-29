@@ -1,4 +1,4 @@
 PORT=1051
-
-echo "Running Server on port $PORT"
-java Server $PORT
+IP=localhost
+echo "Running Server $IP:$PORT"
+java Server $IP $PORT

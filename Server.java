@@ -39,9 +39,9 @@ public class Server extends JFrame implements ActionListener {
     static int VIDEO_LENGTH = 500; //length of the video in frames
 
     Timer timer;    //timer used to send the images at the video frame rate
-    byte[] buf;     //buffer used to store the images to send to the client 
+    byte[] buf;     //buffer used to store the images to send to the client
     int sendDelay;  //the delay to send images over the wire. Ideally should be
-                    //equal to the frame rate of the video file, but may be 
+                    //equal to the frame rate of the video file, but may be
                     //adjusted when congestion is detected.
 
     //RTSP variables
@@ -78,7 +78,7 @@ public class Server extends JFrame implements ActionListener {
     //Performance optimization and Congestion control
     ImageTranslator imgTranslator;
     CongestionController cc;
-    
+
     final static String CRLF = "\r\n";
 
     //--------------------------------
@@ -99,7 +99,7 @@ public class Server extends JFrame implements ActionListener {
         cc = new CongestionController(600);
 
         //allocate memory for the sending buffer
-        buf = new byte[20000]; 
+        buf = new byte[20000];
 
         //Handler to close the main window
         addWindowListener(new WindowAdapter() {
@@ -120,11 +120,11 @@ public class Server extends JFrame implements ActionListener {
         //Video encoding and quality
         imgTranslator = new ImageTranslator(0.8f);
     }
-          
+
     //------------------------------------
     //main
     //------------------------------------
-    public static void main(String argv[]) throws Exception
+    public static void main(String [] argv) throws Exception
     {
         //create a Server object
         Server server = new Server();
@@ -135,11 +135,13 @@ public class Server extends JFrame implements ActionListener {
         server.setSize(new Dimension(400, 200));
 
         //get RTSP socket port from the command line
-        int RTSPport = Integer.parseInt(argv[0]);
+        int RTSPport = Integer.parseInt(argv[1]);
+        // InetAddress addr = InetAddress.getByName("140.124.73.162");
+        InetAddress addr = InetAddress.getByName(argv[0]);
         server.RTSP_dest_port = RTSPport;
-       
+
         //Initiate TCP connection with the client for the RTSP session
-        ServerSocket listenSocket = new ServerSocket(RTSPport);
+        ServerSocket listenSocket = new ServerSocket(RTSPport, 10, addr);
         server.RTSPsocket = listenSocket.accept();
         listenSocket.close();
 
@@ -158,23 +160,23 @@ public class Server extends JFrame implements ActionListener {
         boolean done = false;
         while(!done) {
             request_type = server.parseRequest(); //blocking
-    
+
             if (request_type == SETUP) {
                 done = true;
 
                 //update RTSP state
                 state = READY;
                 System.out.println("New RTSP state: READY");
-             
+
                 //Send response
                 server.sendResponse();
-             
+
                 //init the VideoStream object:
                 server.video = new VideoStream(VideoFileName);
 
                 //init RTP and RTCP sockets
                 server.RTPsocket = new DatagramSocket();
-                server.RTCPsocket = new DatagramSocket(RTCP_RCV_PORT);
+                server.RTCPsocket = new DatagramSocket(RTCP_RCV_PORT, addr);
             }
         }
 
@@ -182,7 +184,7 @@ public class Server extends JFrame implements ActionListener {
         while(true) {
             //parse the request
             request_type = server.parseRequest(); //blocking
-                
+
             if ((request_type == PLAY) && (state == READY)) {
                 //send back response
                 server.sendResponse();
@@ -247,7 +249,7 @@ public class Server extends JFrame implements ActionListener {
 
                 //Builds an RTPpacket object containing the frame
                 RTPpacket rtp_packet = new RTPpacket(MJPEG_TYPE, imagenb, imagenb*FRAME_PERIOD, buf, image_length);
-                
+
                 //get to total length of the full rtp packet to send
                 int packet_length = rtp_packet.getlength();
 
@@ -255,7 +257,7 @@ public class Server extends JFrame implements ActionListener {
                 byte[] packet_bits = new byte[packet_length];
                 rtp_packet.getpacket(packet_bits);
 
-                //send the packet as a DatagramPacket over the UDP socket 
+                //send the packet as a DatagramPacket over the UDP socket
                 senddp = new DatagramPacket(packet_bits, packet_length, ClientIPAddr, RTP_dest_port);
                 RTPsocket.send(senddp);
 
@@ -425,7 +427,7 @@ public class Server extends JFrame implements ActionListener {
     //------------------------------------
     private int parseRequest() {
         int request_type = -1;
-        try { 
+        try {
             //parse request line and extract the request_type:
             String RequestLine = RTSPBufferedReader.readLine();
             System.out.println("RTSP Server - Received from Client:");
@@ -457,7 +459,7 @@ public class Server extends JFrame implements ActionListener {
             tokens = new StringTokenizer(SeqNumLine);
             tokens.nextToken();
             RTSPSeqNb = Integer.parseInt(tokens.nextToken());
-        
+
             //get LastLine
             String LastLine = RTSPBufferedReader.readLine();
             System.out.println(LastLine);
@@ -482,7 +484,7 @@ public class Server extends JFrame implements ActionListener {
             System.out.println("Exception caught: "+ex);
             System.exit(0);
         }
-      
+
         return(request_type);
     }
 
@@ -490,7 +492,7 @@ public class Server extends JFrame implements ActionListener {
     private String describe() {
         StringWriter writer1 = new StringWriter();
         StringWriter writer2 = new StringWriter();
-        
+
         // Write the body first so we can get the size later
         writer2.write("v=0" + CRLF);
         writer2.write("m=video " + RTSP_dest_port + " RTP/AVP " + MJPEG_TYPE + CRLF);
@@ -502,7 +504,7 @@ public class Server extends JFrame implements ActionListener {
         writer1.write("Content-Type: " + "application/sdp" + CRLF);
         writer1.write("Content-Length: " + body.length() + CRLF);
         writer1.write(body);
-        
+
         return writer1.toString();
     }
 
